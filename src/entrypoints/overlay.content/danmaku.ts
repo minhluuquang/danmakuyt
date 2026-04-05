@@ -441,6 +441,21 @@ export class DanmakuRenderer {
     if (this.app.ticker.count % 30 === 0) {
       this.updateLanePositions()
     }
+    
+    // Check canvas is still in DOM every 60 frames (~1s at 60fps)
+    if (this.app.ticker.count % 60 === 0) {
+      this.ensureCanvasInDOM()
+    }
+  }
+  
+  private ensureCanvasInDOM() {
+    if (!this.canvas || !this.videoContainer) return
+    
+    // Check if canvas is still attached to video container
+    if (!this.videoContainer.contains(this.canvas)) {
+      debug('Canvas was removed from DOM, re-inserting')
+      this.videoContainer.insertBefore(this.canvas, this.videoContainer.firstChild)
+    }
   }
 
   resize() {
@@ -466,6 +481,7 @@ export class DanmakuRenderer {
     }
 
     this.isInitialized = false
+    this.videoContainer = null
   }
 }
 
