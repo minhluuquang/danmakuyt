@@ -353,7 +353,7 @@ export class DanmakuRenderer {
     }
   }
 
-  private async processQueue() {
+  private processQueue() {
     if (!this.container || !this.app) return
     if (this.messageQueue.length === 0) return
 
@@ -361,10 +361,11 @@ export class DanmakuRenderer {
     const message = this.messageQueue.shift()
     if (!message) return
 
-    await this.renderComment(message)
+    // Fire and forget - don't await, let animation continue
+    this.renderComment(message)
   }
 
-  private async renderComment(message: ChatMessage) {
+  private renderComment(message: ChatMessage) {
     if (!this.container || !this.app) return
 
     const speed = this.getSpeed()
@@ -420,39 +421,54 @@ export class DanmakuRenderer {
 
     this.activeComments.add(comment)
 
-    // Load images asynchronously AFTER adding container to stage
+    // Load images asynchronously WITHOUT blocking - fire and forget
     if (message.images && message.images.length > 0) {
       // Limit images per message to prevent spam
       const imagesToLoad = message.images.slice(0, 10)
       
-      for (const imgUrl of imagesToLoad) {
-        try {
-          const texture = await this.getCachedTexture(imgUrl)
-          if (texture && this.activeComments.has(comment)) {
-            const sprite = new Sprite(texture)
-            sprite.x = currentX
-            sprite.y = 0
-            
-            commentContainer.addChild(sprite)
-            currentX += emojiSize + emojiSpacing
-            
-            // Update comment width
-            comment.width = currentX
-          }
-        } catch (error) {
-          debug(`Failed to load emoji image: ${imgUrl.substring(0, 60)}`)
-        }
-      }
+      // Don't await this - let it run in background
+      this.loadImagesForComment(comment, commentContainer, imagesToLoad, currentX, emojiSize, emojiSpacing)
     }
 
     debug(`Rendered: ${message.author} on lane ${laneIndex} with ${Math.min(message.images?.length || 0, 10)} images`)
+  }
+  
+  private async loadImagesForComment(
+    comment: ActiveComment,
+    container: Container,
+    imageUrls: string[],
+    startX: number,
+    emojiSize: number,
+    emojiSpacing: number
+  ) {
+    let currentX = startX
+    
+    for (const imgUrl of imageUrls) {
+      try {
+        const texture = await this.getCachedTexture(imgUrl)
+        // Check comment still exists and container is still on stage
+        if (texture && this.activeComments.has(comment) && container.parent) {
+          const sprite = new Sprite(texture)
+          sprite.x = currentX
+          sprite.y = 0
+          
+          container.addChild(sprite)
+          currentX += emojiSize + emojiSpacing
+          
+          // Update comment width
+          comment.width = currentX
+        }
+      } catch (error) {
+        debug(`Failed to load emoji image: ${imgUrl.substring(0, 60)}`)
+      }
+    }
   }
 
   private async animate() {
     if (!this.container || !this.app) return
 
-    // Process queued messages
-    await this.processQueue()
+    // Process queued messages - DON'T await to prevent blocking
+    this.processQueue()
 
     // Move all comments
     for (const comment of this.activeComments) {
