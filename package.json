@@ -8,7 +8,8 @@
     "build": "wxt build",
     "zip": "wxt zip",
     "postinstall": "wxt prepare",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "docs:list": "bun run scripts/docs-list.ts"
   },
   "devDependencies": {
     "@radix-ui/react-hover-card": "^1.1.15",

@@ -1,12 +1,15 @@
-# DanmakuYT Architecture
+---
+summary: System architecture, data flow, and key design decisions for DanmakuYT
+read_when: ['new to project', 'understanding data flow', 'architectural changes']
+---
+
+# Architecture
 
 ## Overview
 
 DanmakuYT is a browser extension that captures YouTube live stream chat messages and displays them in a Chrome sidepanel. It uses a **DOM-based approach** to read chat messages without intercepting network requests, ensuring stability and avoiding conflicts with YouTube's video player.
 
-## Architecture
-
-### Components
+## Components
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -97,6 +100,7 @@ extractMessages() reads from DOM:
 ### 2. Message Transmission
 
 **Injected Script → Content Script:**
+
 ```javascript
 // In yt-chat-inject.js
 window.postMessage({
@@ -112,6 +116,7 @@ window.postMessage({
 ```
 
 **Content Script → Background:**
+
 ```javascript
 // In content.ts
 browser.runtime.sendMessage({
@@ -121,6 +126,7 @@ browser.runtime.sendMessage({
 ```
 
 **Background → Sidepanel:**
+
 ```javascript
 // In background.ts
 browser.runtime.sendMessage({
@@ -132,6 +138,7 @@ browser.runtime.sendMessage({
 ### 3. State Management
 
 **Background Script (In-Memory Storage):**
+
 ```
 Map<tabId, messages[]>
   • Stores up to 100 messages per tab
@@ -140,6 +147,7 @@ Map<tabId, messages[]>
 ```
 
 **Sidepanel (React State):**
+
 ```
 useState<messages[]>
   • Appends new messages
@@ -169,7 +177,11 @@ public/
 └── yt-chat-inject.js       # (copied to dist)
 
 docs/
-└── ARCHITECTURE.md         # This file
+├── architecture.md
+├── commands.md
+├── pixijs.md
+├── patterns.md
+└── common-issues.md
 ```
 
 ## Key Design Decisions
@@ -245,35 +257,8 @@ docs/
 2. **No Persistence:** Messages lost on extension reload
 3. **Single Tab:** Currently tracks one stream at a time
 
-## Development
-
-### Setup:
-
-```bash
-# Install dependencies
-bun install
-
-# Development with hot reload
-bun run dev
-
-# Production build
-bun run build
-
-# Create distribution zip
-bun run zip
-```
-
-### Testing:
-
-1. Load extension in Chrome
-2. Navigate to YouTube live stream
-3. Open sidepanel
-4. Verify messages appear
-5. Monitor for stability (no video player crashes)
-
 ## References
 
 - **WXT:** https://wxt.dev/
 - **Chrome Extension API:** https://developer.chrome.com/docs/extensions/
 - **MutationObserver:** https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver
-- **YouTube Live Chat:** Reverse engineered DOM structure
