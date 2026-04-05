@@ -275,21 +275,42 @@ export class DanmakuRenderer {
     const img = new Image()
     img.crossOrigin = 'anonymous'
     
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error('Image failed to load'))
+    // Set a timeout to prevent hanging
+    const timeoutMs = 5000
+    
+    return new Promise((resolve, reject) => {
+      const timeoutId = setTimeout(() => {
+        reject(new Error('Image load timeout'))
+      }, timeoutMs)
+      
+      img.onload = () => {
+        clearTimeout(timeoutId)
+        try {
+          // Draw image to canvas
+          const canvas = document.createElement('canvas')
+          canvas.width = FONT_SIZE
+          canvas.height = FONT_SIZE
+          const ctx = canvas.getContext('2d')
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'))
+            return
+          }
+          
+          ctx.drawImage(img, 0, 0, FONT_SIZE, FONT_SIZE)
+          const texture = Texture.from(canvas)
+          resolve(texture)
+        } catch (error) {
+          reject(error)
+        }
+      }
+      
+      img.onerror = () => {
+        clearTimeout(timeoutId)
+        reject(new Error('Image failed to load'))
+      }
+      
       img.src = imgUrl
     })
-    
-    // Draw image to canvas
-    const canvas = document.createElement('canvas')
-    canvas.width = FONT_SIZE
-    canvas.height = FONT_SIZE
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Failed to get canvas context')
-    
-    ctx.drawImage(img, 0, 0, FONT_SIZE, FONT_SIZE)
-    return Texture.from(canvas)
   }
 
   private shouldShowMessage(message: ChatMessage): boolean {
@@ -378,31 +399,14 @@ export class DanmakuRenderer {
       currentX += authorSprite.width + textSpacing
     }
 
-    // Add image emojis (cached)
-    if (message.images && message.images.length > 0) {
-      for (const imgUrl of message.images) {
-        const texture = await this.getCachedTexture(imgUrl)
-        if (texture) {
-          const sprite = new Sprite(texture)
-          sprite.x = currentX
-          sprite.y = 0
-          
-          commentContainer.addChild(sprite)
-          currentX += emojiSize + emojiSpacing
-        } else {
-          debug(`Failed to load cached emoji image: ${imgUrl.substring(0, 60)}`)
-        }
-      }
-    }
-
-    // Calculate total width
-    const totalWidth = currentX
+    // Calculate initial width (without images)
+    let totalWidth = currentX
 
     // Find a lane with simple round-robin
     const laneIndex = this.nextLaneIndex
     this.nextLaneIndex = (this.nextLaneIndex + 1) % this.laneYPositions.length
 
-    // Position and add to stage
+    // Position and add to stage immediately (don't wait for images)
     commentContainer.x = this.app.screen.width
     commentContainer.y = this.laneYPositions[laneIndex]
 
@@ -416,7 +420,32 @@ export class DanmakuRenderer {
 
     this.activeComments.add(comment)
 
-    debug(`Rendered: ${message.author} on lane ${laneIndex} with ${message.images?.length || 0} images`)
+    // Load images asynchronously AFTER adding container to stage
+    if (message.images && message.images.length > 0) {
+      // Limit images per message to prevent spam
+      const imagesToLoad = message.images.slice(0, 10)
+      
+      for (const imgUrl of imagesToLoad) {
+        try {
+          const texture = await this.getCachedTexture(imgUrl)
+          if (texture && this.activeComments.has(comment)) {
+            const sprite = new Sprite(texture)
+            sprite.x = currentX
+            sprite.y = 0
+            
+            commentContainer.addChild(sprite)
+            currentX += emojiSize + emojiSpacing
+            
+            // Update comment width
+            comment.width = currentX
+          }
+        } catch (error) {
+          debug(`Failed to load emoji image: ${imgUrl.substring(0, 60)}`)
+        }
+      }
+    }
+
+    debug(`Rendered: ${message.author} on lane ${laneIndex} with ${Math.min(message.images?.length || 0, 10)} images`)
   }
 
   private async animate() {
