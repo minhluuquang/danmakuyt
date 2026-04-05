@@ -100,8 +100,6 @@ function installDanmakuFonts() {
     name: FONT_SUPERCHAT,
     style: { ...baseStyle, fill: 0xeab308 },
   })
-
-  debug('Bitmap fonts installed')
 }
 
 function getFontName(type: ChatMessage['type']): string {
@@ -129,6 +127,8 @@ export class DanmakuRenderer {
   private messageQueue: ChatMessage[] = []
   private isInitialized = false
   private ticker: Ticker | null = null
+  private lastRenderTime = 0
+  private readonly MIN_RENDER_INTERVAL = 50 // ms between comments (max 20/sec)
   
   // Lane tracking
   private laneYPositions: number[] = []
@@ -139,11 +139,9 @@ export class DanmakuRenderer {
 
   async init(videoContainer: HTMLElement) {
     if (this.isInitialized) {
-      debug('init() called but already initialized, skipping')
       return
     }
 
-    debug('Initializing DanmakuRenderer...')
     this.videoContainer = videoContainer
     await this.loadSettings()
 
@@ -180,7 +178,7 @@ export class DanmakuRenderer {
         antialias: false,
         resolution: window.devicePixelRatio || 1,
         autoDensity: true,
-        preference: 'webgpu',
+        preference: 'webgl', // Use WebGL instead of WebGPU for better compatibility
       })
 
       this.container = new Container()
@@ -192,7 +190,6 @@ export class DanmakuRenderer {
       this.ticker.add(() => this.animate())
 
       this.isInitialized = true
-      debug('DanmakuRenderer initialized successfully!')
     } catch (error) {
       console.error(LOG_PREFIX, 'Failed to initialize PixiJS:', error)
     }
@@ -211,8 +208,6 @@ export class DanmakuRenderer {
       this.laneYPositions.push(i * LANE_HEIGHT + 12)
       this.laneLastEndTime.push(0)
     }
-    
-    debug(`Updated lanes: ${laneCount}`)
   }
 
   private async loadSettings() {
@@ -338,8 +333,6 @@ export class DanmakuRenderer {
     
     if (!this.shouldShowMessage(message)) return
 
-    debug(`addMessage: ${message.author}: ${message.text?.substring(0, 30)}...`)
-
     if (!this.isInitialized) {
       this.messageQueue.push(message)
       return
@@ -347,8 +340,8 @@ export class DanmakuRenderer {
 
     this.messageQueue.push(message)
     
-    // Limit queue size
-    if (this.messageQueue.length > 100) {
+    // Limit queue size - drop oldest when too many pending
+    if (this.messageQueue.length > 50) {
       this.messageQueue.shift()
     }
   }
@@ -356,6 +349,13 @@ export class DanmakuRenderer {
   private processQueue() {
     if (!this.container || !this.app) return
     if (this.messageQueue.length === 0) return
+    
+    // Rate limiting: don't render faster than MIN_RENDER_INTERVAL
+    const now = Date.now()
+    if (now - this.lastRenderTime < this.MIN_RENDER_INTERVAL) {
+      return // Skip this frame, wait for next
+    }
+    this.lastRenderTime = now
 
     // Process one message per frame for smooth animation
     const message = this.messageQueue.shift()
@@ -429,8 +429,6 @@ export class DanmakuRenderer {
       // Don't await this - let it run in background
       this.loadImagesForComment(comment, commentContainer, imagesToLoad, currentX, emojiSize, emojiSpacing)
     }
-
-    debug(`Rendered: ${message.author} on lane ${laneIndex} with ${Math.min(message.images?.length || 0, 10)} images`)
   }
   
   private async loadImagesForComment(
@@ -459,7 +457,7 @@ export class DanmakuRenderer {
           comment.width = currentX
         }
       } catch (error) {
-        debug(`Failed to load emoji image: ${imgUrl.substring(0, 60)}`)
+        // Silent fail for image loading errors
       }
     }
   }
@@ -471,15 +469,21 @@ export class DanmakuRenderer {
     this.processQueue()
 
     // Move all comments
+    const toRemove: ActiveComment[] = []
     for (const comment of this.activeComments) {
       comment.container.x -= comment.speed
 
-      // Remove if off-screen
+      // Mark for removal if off-screen
       if (comment.container.x < -comment.width - 50) {
-        this.container.removeChild(comment.container)
-        comment.container.destroy()
-        this.activeComments.delete(comment)
+        toRemove.push(comment)
       }
+    }
+    
+    // Remove marked comments (after iteration to avoid skipping)
+    for (const comment of toRemove) {
+      this.container.removeChild(comment.container)
+      comment.container.destroy()
+      this.activeComments.delete(comment)
     }
 
     // Check for resize every 30 frames (~0.5s at 60fps)
@@ -496,12 +500,10 @@ export class DanmakuRenderer {
   private ensureCanvasInDOM() {
     if (!this.canvas || !this.videoContainer) return
     
-    const isVisible = this.videoContainer.contains(this.canvas)
+    const isInDOM = this.videoContainer.contains(this.canvas)
     
-    if (!isVisible) {
-      console.log(`[DanmakuYT] CANVAS_HIDDEN - re-inserting into DOM`)
+    if (!isInDOM) {
       this.videoContainer.insertBefore(this.canvas, this.videoContainer.firstChild)
-      console.log(`[DanmakuYT] CANVAS_VISIBLE - re-inserted successfully`)
     }
   }
 

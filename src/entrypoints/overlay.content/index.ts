@@ -42,18 +42,9 @@ export default defineContentScript({
     let initAttempts = 0
     const MAX_INIT_ATTEMPTS = 30
 
-    // Lifecycle logging - always enabled for visibility
-    const log = (action: string, details?: any) => {
-      const timestamp = new Date().toISOString().split('T')[1].slice(0, 8)
-      const detailsStr = details ? ` | ${JSON.stringify(details)}` : ''
-      console.log(`[DanmakuYT ${timestamp}] ${action}${detailsStr}`)
-    }
-
     // Initialize danmaku overlay
     const initDanmaku = async () => {
       if (!isActive) return
-      
-      log('INIT_ATTEMPT', { attempt: initAttempts + 1 })
       
       // Find video container - try multiple selectors
       const selectors = [
@@ -67,10 +58,7 @@ export default defineContentScript({
       let videoContainer: HTMLElement | null = null
       for (const selector of selectors) {
         videoContainer = document.querySelector(selector) as HTMLElement | null
-        if (videoContainer) {
-          log('CONTAINER_FOUND', { selector })
-          break
-        }
+        if (videoContainer) break
       }
       
       if (!videoContainer) {
@@ -82,25 +70,10 @@ export default defineContentScript({
       }
 
       // Skip if already initialized
-      if (renderer) {
-        log('INIT_SKIP', { reason: 'renderer_exists' })
-        return
-      }
+      if (renderer) return
 
-      log('RENDERER_CREATE')
       renderer = new DanmakuRenderer()
-      
-      // Override destroy to log unmount
-      const originalDestroy = renderer.destroy.bind(renderer)
-      renderer.destroy = () => {
-        log('OVERLAY_UNMOUNT')
-        originalDestroy()
-      }
-      
       await renderer.init(videoContainer)
-      log('OVERLAY_MOUNT', { 
-        videoId: location.href.split('v=')[1]?.split('&')[0] 
-      })
     }
 
     // Listen for messages from background script
@@ -134,7 +107,6 @@ export default defineContentScript({
       }
       resizeTimeout = window.setTimeout(() => {
         if (renderer) {
-          log('RESIZE')
           renderer.resize()
         }
       }, 100)
@@ -162,8 +134,6 @@ export default defineContentScript({
         const isWatchPage = currentUrl.includes('/watch')
         const isSameVideo = oldUrl.split('v=')[1]?.split('&')[0] === currentUrl.split('v=')[1]?.split('&')[0]
         
-        log('URL_CHANGE', { isWatchPage, isSameVideo })
-        
         // Skip if it's just a hash change or same video
         if (!isWatchPage || isSameVideo) {
           return
@@ -174,7 +144,6 @@ export default defineContentScript({
           clearTimeout(reinitTimeout)
         }
         
-        log('REINIT_SCHEDULED')
         reinitTimeout = window.setTimeout(() => {
           // Clean up old renderer
           if (renderer) {
@@ -191,7 +160,6 @@ export default defineContentScript({
 
     // Cleanup on extension reload/update
     ctx.onInvalidated(() => {
-      log('EXTENSION_INVALIDATED')
       isActive = false
       urlObserver.disconnect()
       if (resizeTimeout) clearTimeout(resizeTimeout)

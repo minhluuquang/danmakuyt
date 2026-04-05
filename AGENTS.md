@@ -5,7 +5,7 @@ Browser extension for YouTube danmaku (bullet comments) using WXT, React, Radix 
 ## Repository Information
 
 - **Owner:** Leo
-- **Tech Stack:** WXT, React, TypeScript, Tailwind CSS 4, Radix UI, PixiJS v8 (WebGPU)
+- **Tech Stack:** WXT, React, TypeScript, Tailwind CSS 4, Radix UI, PixiJS v8 (WebGL)
 - **Package Manager:** Bun
 - **Extension Type:** Chrome browser extension with PixiJS canvas overlay
 

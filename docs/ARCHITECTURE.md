@@ -319,7 +319,7 @@ docs/
 - ✅ **Simple and predictable** - Queue-based processing
 - ✅ **Smooth animation** - Consistent frame rate
 - ✅ **Image caching** - No redundant downloads
-- ✅ **Hardware accelerated** - PixiJS WebGPU rendering
+- ✅ **Hardware accelerated** - PixiJS WebGL rendering
 
 ## Settings UI
 

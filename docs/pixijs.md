@@ -1,11 +1,11 @@
 ---
-summary: PixiJS v8 WebGPU integration for rendering danmaku (bullet comments)
+summary: PixiJS v8 WebGL integration for rendering danmaku (bullet comments)
 read_when: ['working with PixiJS', 'implementing danmaku rendering', 'adding canvas animation']
 ---
 
 # PixiJS Integration
 
-**CRITICAL: This project uses PixiJS v8 with WebGPU only.** Do not use WebGL fallback.
+**This project uses PixiJS v8 with WebGL for maximum compatibility.**
 
 ## Installation
 
@@ -15,14 +15,16 @@ bun add pixi.js@^8.0.0
 
 ## Renderer Setup
 
-Use the `Application` class with **WebGPU only**:
+Use the `Application` class with **WebGL**:
 
 ```typescript
 import { Application } from 'pixi.js'
 
-const app = new Application({
-  preferWebGLVersion: 2, // Force WebGPU
-  // Never set webgl as fallback
+const app = new Application()
+await app.init({
+  canvas: myCanvas,
+  resizeTo: container,
+  preference: 'webgl', // Use WebGL for better compatibility
 })
 ```
 
@@ -313,4 +315,4 @@ See `src/entrypoints/overlay.content/danmaku.ts` for the complete implementation
 ## Resources
 
 - **PixiJS v8 Docs:** https://pixijs.com/llms.txt
-- **WebGPU Support:** Requires Chrome 113+ with WebGPU enabled
+- **WebGL Support:** Works in all modern browsers
