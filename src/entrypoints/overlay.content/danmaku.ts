@@ -496,10 +496,12 @@ export class DanmakuRenderer {
   private ensureCanvasInDOM() {
     if (!this.canvas || !this.videoContainer) return
     
-    // Check if canvas is still attached to video container
-    if (!this.videoContainer.contains(this.canvas)) {
-      debug('Canvas was removed from DOM, re-inserting')
+    const isVisible = this.videoContainer.contains(this.canvas)
+    
+    if (!isVisible) {
+      console.log(`[DanmakuYT] CANVAS_HIDDEN - re-inserting into DOM`)
       this.videoContainer.insertBefore(this.canvas, this.videoContainer.firstChild)
+      console.log(`[DanmakuYT] CANVAS_VISIBLE - re-inserted successfully`)
     }
   }
 

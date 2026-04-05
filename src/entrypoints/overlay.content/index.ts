@@ -42,17 +42,18 @@ export default defineContentScript({
     let initAttempts = 0
     const MAX_INIT_ATTEMPTS = 30
 
-    // Debug logging
-    const DEBUG = false
-    const log = (...args: any[]) => {
-      if (DEBUG) console.log('[DanmakuOverlay]', ...args)
+    // Lifecycle logging - always enabled for visibility
+    const log = (action: string, details?: any) => {
+      const timestamp = new Date().toISOString().split('T')[1].slice(0, 8)
+      const detailsStr = details ? ` | ${JSON.stringify(details)}` : ''
+      console.log(`[DanmakuYT ${timestamp}] ${action}${detailsStr}`)
     }
 
     // Initialize danmaku overlay
     const initDanmaku = async () => {
       if (!isActive) return
       
-      log(`initDanmaku attempt ${initAttempts + 1}`)
+      log('INIT_ATTEMPT', { attempt: initAttempts + 1 })
       
       // Find video container - try multiple selectors
       const selectors = [
@@ -67,7 +68,7 @@ export default defineContentScript({
       for (const selector of selectors) {
         videoContainer = document.querySelector(selector) as HTMLElement | null
         if (videoContainer) {
-          log(`Found video container with selector: ${selector}`)
+          log('CONTAINER_FOUND', { selector })
           break
         }
       }
@@ -75,7 +76,6 @@ export default defineContentScript({
       if (!videoContainer) {
         initAttempts++
         if (initAttempts < MAX_INIT_ATTEMPTS) {
-          log(`Video container not found, retrying in 1s (attempt ${initAttempts}/${MAX_INIT_ATTEMPTS})`)
           setTimeout(initDanmaku, 1000)
         }
         return
@@ -83,14 +83,24 @@ export default defineContentScript({
 
       // Skip if already initialized
       if (renderer) {
-        log('Renderer already exists, skipping init')
+        log('INIT_SKIP', { reason: 'renderer_exists' })
         return
       }
 
-      log('Creating new DanmakuRenderer')
+      log('RENDERER_CREATE')
       renderer = new DanmakuRenderer()
+      
+      // Override destroy to log unmount
+      const originalDestroy = renderer.destroy.bind(renderer)
+      renderer.destroy = () => {
+        log('OVERLAY_UNMOUNT')
+        originalDestroy()
+      }
+      
       await renderer.init(videoContainer)
-      log('Renderer initialized successfully')
+      log('OVERLAY_MOUNT', { 
+        videoId: location.href.split('v=')[1]?.split('&')[0] 
+      })
     }
 
     // Listen for messages from background script
@@ -124,7 +134,7 @@ export default defineContentScript({
       }
       resizeTimeout = window.setTimeout(() => {
         if (renderer) {
-          log('Window resized, updating renderer')
+          log('RESIZE')
           renderer.resize()
         }
       }, 100)
@@ -152,12 +162,10 @@ export default defineContentScript({
         const isWatchPage = currentUrl.includes('/watch')
         const isSameVideo = oldUrl.split('v=')[1]?.split('&')[0] === currentUrl.split('v=')[1]?.split('&')[0]
         
-        log(`URL changed from ${oldUrl} to ${currentUrl}`)
-        log(`isWatchPage: ${isWatchPage}, isSameVideo: ${isSameVideo}`)
+        log('URL_CHANGE', { isWatchPage, isSameVideo })
         
         // Skip if it's just a hash change or same video
         if (!isWatchPage || isSameVideo) {
-          log('Skipping reinit - not a new video page')
           return
         }
         
@@ -166,11 +174,10 @@ export default defineContentScript({
           clearTimeout(reinitTimeout)
         }
         
-        log('Scheduling re-initialization in 1s')
+        log('REINIT_SCHEDULED')
         reinitTimeout = window.setTimeout(() => {
           // Clean up old renderer
           if (renderer) {
-            log('Destroying old renderer')
             renderer.destroy()
             renderer = null
           }
@@ -184,7 +191,7 @@ export default defineContentScript({
 
     // Cleanup on extension reload/update
     ctx.onInvalidated(() => {
-      log('Extension invalidated, cleaning up')
+      log('EXTENSION_INVALIDATED')
       isActive = false
       urlObserver.disconnect()
       if (resizeTimeout) clearTimeout(resizeTimeout)
