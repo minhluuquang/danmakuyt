@@ -1,5 +1,7 @@
 // Background script - handles chat message routing
 
+import { storage } from 'wxt/utils/storage'
+
 // Store recent chat messages in memory
 const recentMessages = new Map<number, any[]>() // tabId -> messages
 
@@ -15,7 +17,7 @@ export default defineBackground(() => {
         break
         
       case 'PING':
-        sendResponse({ success: true, message: 'pong' })
+        sendResponse({ success: true })
         break
         
       case 'GET_CHAT_MESSAGES':
@@ -39,7 +41,7 @@ export default defineBackground(() => {
   })
   
   // Handle tab updates to clear old messages
-  browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  browser.tabs.onUpdated.addListener((tabId, changeInfo) => {
     if (changeInfo.url) {
       recentMessages.delete(tabId)
     }
@@ -74,20 +76,20 @@ function handleChatMessages(payload: any, tabId?: number) {
     tabMessages.splice(0, tabMessages.length - 100)
   }
   
-  // Forward to sidepanel if open
-  forwardToSidepanel(tabId, messages)
+  // Forward to content script for danmaku overlay
+  forwardToContentScript(tabId, messages)
 }
 
-async function forwardToSidepanel(tabId: number, messages: any[]) {
+async function forwardToContentScript(tabId: number, messages: any[]) {
   try {
-    await browser.runtime.sendMessage({
-      type: 'NEW_CHAT_MESSAGES',
+    await browser.tabs.sendMessage(tabId, {
+      type: 'YOUTUBE_CHAT_MESSAGES',
       payload: {
         tabId,
         messages
       }
     })
   } catch (e) {
-    // Sidepanel might not be open - that's okay
+    // Content script might not be loaded yet - that's okay
   }
 }

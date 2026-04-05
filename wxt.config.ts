@@ -41,7 +41,7 @@ export default defineConfig({
     default_locale: 'en',
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
-    permissions: ['tabs', 'sidePanel', 'storage'],
+    permissions: ['tabs', 'storage'],
     host_permissions: ['<all_urls>'],
     icons: {
       16: 'icon-16.png',
@@ -51,9 +51,7 @@ export default defineConfig({
     },
     action: {
       default_title: '__MSG_extActionTitle__',
-    },
-    side_panel: {
-      default_path: 'sidepanel/index.html',
+      default_popup: 'popup/index.html',
     },
     web_accessible_resources: [{
       resources: ['yt-chat-inject.js'],
