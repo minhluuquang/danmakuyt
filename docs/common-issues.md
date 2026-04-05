@@ -72,3 +72,76 @@ If the extension won't load:
 1. Check `wxt.config.ts` for valid manifest configuration
 2. Ensure all required permissions are declared
 3. Verify icon paths in `public/` match manifest
+
+## 9. Danmaku Rendering Issues
+
+### No Comments Appearing
+
+**Check:**
+1. Is danmaku enabled in the popup settings?
+2. Are message types enabled (Standard/Member/Moderator/SuperChat)?
+3. Is the live chat panel open on YouTube?
+4. Check browser console for PixiJS errors
+
+### Overlapping Text
+
+**Likely cause:** Lane collision detection failing.
+
+**Debug:**
+```typescript
+// Check lane state
+console.log('Total lanes:', laneManager.getTotalLanes())
+console.log('Min spacing:', capacityManager.getMinSpacing(mode))
+```
+
+### Comments Disappearing Too Fast (Overload Mode)
+
+**This is expected behavior** in high-traffic streams:
+- Overload mode activates at >150% capacity
+- Score-based admission drops low-value comments
+- Only ~30% diversity is guaranteed (rest may be duplicates)
+
+**To see more comments:**
+- Increase density setting in popup (increases capacity)
+- Slow down speed (comments stay longer, but may cause overlap)
+
+### All Comments Show Same Message
+
+**Likely cause:** Burst compression working as intended.
+
+**Expected behavior in Busy/Overload modes:**
+- Similar messages merged within 3s window
+- Display shows "message ×N" format
+- Diversity enforcement prevents spam floods
+
+### Mode Flickering (Rapid Normal→Busy→Normal)
+
+**This should not happen** with the hysteresis buffers:
+- Normal→Busy at 95% (80% + 15% buffer)
+- Busy→Normal at 70% (80% - 10% buffer)
+
+**If flickering occurs:**
+1. Check `CapacityManager.getMode()` hysteresis values
+2. Verify mode check interval (500ms minimum)
+3. Check input rate smoothing window (3s moving average)
+
+### WebGPU Not Supported
+
+**Error:** "WebGPU is not supported"
+
+**Solution:**
+- Requires Chrome 113+ with WebGPU enabled
+- Check `chrome://gpu/` for WebGPU status
+- PixiJS will fail to initialize (danmaku won't appear)
+
+### High CPU Usage in Overload Mode
+
+**Expected:** Overload mode uses more CPU for:
+- Scoring algorithm (O(n log n) sorting)
+- Similarity calculations for duplicate detection
+- Burst group management
+
+**Mitigation:**
+- Scoring only runs in Overload mode
+- Cleanup runs every 10s (not every frame)
+- Buffer size limits prevent unbounded growth

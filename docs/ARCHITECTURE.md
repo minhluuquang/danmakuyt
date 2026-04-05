@@ -145,30 +145,51 @@ browser.tabs.sendMessage(tabId, {
 
 ### 3. Danmaku Rendering (PixiJS)
 
-**Location:** `src/entrypoints/overlay.content/index.ts`
+**Location:** `src/entrypoints/overlay.content/`
+
+**Files:**
+- `index.ts` - Content script entry point
+- `danmaku.ts` - Core renderer
 
 ```
 Receive message from background
         ↓
 Check settings (enabled? type allowed?)
         ↓
-Create BitmapText with styling:
-  - Color based on type (white/green/blue/gold)
-  - Drop shadow for readability
-  - Font: Inter/system-ui
+Add to message queue
         ↓
-Position in available lane
+Process queue: render one message per frame
+        ↓
+Create BitmapText with pre-installed font
+        ↓
+Assign to lane via round-robin
+        ↓
+Add image emojis (cached by URL)
         ↓
 Animate: x -= speed each frame
         ↓
 Remove when off-screen
 ```
 
-**Lane Management:**
-- Messages flow in horizontal lanes
-- Each lane can have one message at a time
-- Prevents overlapping text
-- Random lane assignment when all occupied
+**Simple Queue-Based Flow:**
+1. `addMessage()` - Pushes message to queue
+2. `processQueue()` - Renders one message per frame
+3. `animate()` - Moves comments left, removes when off-screen
+
+**Lane Assignment:**
+- Round-robin lane selection (no collision detection)
+- Fixed horizontal lanes based on video height
+- Simple and predictable distribution
+
+**Image Caching:**
+- Images cached by URL to avoid redundant downloads
+- Texture reuse for repeated emojis/stickers
+- Canvas-based conversion for PixiJS compatibility
+
+**Speed Configuration:**
+- Slow: 1.5 px/frame
+- Normal: 2.5 px/frame  
+- Fast: 3.5 px/frame
 
 ## File Structure
 
@@ -176,23 +197,24 @@ Remove when off-screen
 src/
 ├── entrypoints/
 │   ├── content.ts          # Content script (iframe only)
-│   ├── overlay.content/    # Danmaku overlay content script
-│   │   └── index.ts        # PixiJS renderer
-│   ├── background.ts       # Service worker
-│   └── popup/              # Settings popup
+│   ├── overlay.content/     # Danmaku overlay content script
+│   │   ├── index.ts         # Content script entry point
+│   │   └── danmaku.ts       # Core renderer (3-mode system)
+│   ├── background.ts        # Service worker
+│   └── popup/               # Settings popup
 │       ├── index.html
 │       ├── main.tsx
 │       └── App.tsx
 ├── components/
-│   └── ui/                 # shadcn/ui components
+│   └── ui/                  # shadcn/ui components
 ├── assets/
-│   └── index.css           # Tailwind styles
+│   └── index.css            # Tailwind styles
 └── public/
-    └── yt-chat-inject.js   # Injected DOM scraper
+    └── yt-chat-inject.js    # Injected DOM scraper
 
 public/
-├── icon-*.png              # Extension icons
-└── yt-chat-inject.js       # (copied to dist)
+├── icon-*.png               # Extension icons
+└── yt-chat-inject.js        # (copied to dist)
 
 docs/
 ├── architecture.md
@@ -274,19 +296,30 @@ docs/
 
 ### Optimizations:
 
-1. **Minimal DOM Queries:** Uses `querySelectorAll` with specific selectors
-2. **Deduplication:** Tracks processed element IDs in a Set (max 500)
-3. **Batched Updates:** MutationObserver throttled to 100ms
-4. **Memory Limits:** Keeps only last 100 messages (background)
-5. **Lane Management:** Prevents text overlap, limits concurrent messages
-6. **BitmapText:** Hardware-accelerated text rendering
+1. **Simple Queue System:** One message processed per frame for smooth animation
+2. **BitmapText with Pre-installed Fonts:** Hardware-accelerated text rendering
+3. **Image Caching:** Reuse textures for repeated emojis/stickers
+4. **Round-robin Lane Assignment:** Minimal CPU overhead, no collision detection
+5. **Efficient Cleanup:** Destroy containers when off-screen
+6. **Minimal DOM Queries:** Uses MutationObserver for chat detection
+7. **Deduplication:** Tracks processed element IDs in a Set (max 500)
+8. **Batched Updates:** MutationObserver throttled to 100ms
+9. **Memory Limits:** Keeps only last 100 messages (background)
 
 ### Resource Usage:
 
-- **CPU:** Low (MutationObserver + PixiJS ticker)
-- **Memory:** ~2-3MB for message storage + PixiJS buffers
-- **Network:** Zero (doesn't make API calls)
-- **GPU:** Minimal (2D text rendering)
+| Component | Impact |
+|-----------|--------|
+| PixiJS Rendering | Minimal CPU/GPU |
+| Message Queue | Low memory (~2-3MB) |
+| Image Cache | Depends on unique emojis |
+
+### Output Guarantees:
+
+- ✅ **Simple and predictable** - Queue-based processing
+- ✅ **Smooth animation** - Consistent frame rate
+- ✅ **Image caching** - No redundant downloads
+- ✅ **Hardware accelerated** - PixiJS WebGPU rendering
 
 ## Settings UI
 

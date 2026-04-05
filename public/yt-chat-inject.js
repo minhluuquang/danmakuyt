@@ -78,6 +78,7 @@
       var text = ''
       var avatar = ''
       var amount = ''
+      var images = []
       
       if (type === 'superchat') {
         // Super chat extraction
@@ -89,17 +90,37 @@
                (item.querySelector('[id*="message"]')?.textContent?.trim()) || ''
         avatar = (item.querySelector('#author-photo img, #img, [id*="photo"] img')?.getAttribute('src')) || ''
         amount = (item.querySelector('#purchase-amount, .purchase-amount, [class*="purchase"]')?.textContent?.trim()) || ''
+        
+        // Extract images from superchat
+        var superChatImages = item.querySelectorAll('#message img, #content img')
+        for (var si = 0; si < superChatImages.length; si++) {
+          var src = superChatImages[si].getAttribute('src')
+          if (src) images.push(src)
+        }
       } else {
         // Regular message extraction
         author = (item.querySelector('#author-name')?.textContent?.trim()) || 
                  (item.querySelector('[id*="author"]')?.textContent?.trim()) || ''
-        text = (item.querySelector('#message')?.textContent?.trim()) || 
-               (item.querySelector('[id*="message"]')?.textContent?.trim()) || ''
+        
+        // Get message element
+        var messageEl = item.querySelector('#message')
+        if (messageEl) {
+          // Get text content (this excludes images)
+          text = messageEl.textContent?.trim() || ''
+          
+          // Extract all image URLs from emojis/stickers
+          var messageImages = messageEl.querySelectorAll('img')
+          for (var mi = 0; mi < messageImages.length; mi++) {
+            var imgSrc = messageImages[mi].getAttribute('src')
+            if (imgSrc) images.push(imgSrc)
+          }
+        }
+        
         avatar = (item.querySelector('#author-photo img, #img, [id*="photo"] img')?.getAttribute('src')) || ''
       }
       
-      if (author && text) {
-        messages.push({
+      if (author && (text || images.length > 0)) {
+        var messageData = {
           type: type,
           text: text,
           author: author,
@@ -108,7 +129,14 @@
           channelId: '',
           id: id,
           amount: amount || undefined
-        })
+        }
+        
+        // Only add images if there are any
+        if (images.length > 0) {
+          messageData.images = images
+        }
+        
+        messages.push(messageData)
       }
     }
     
