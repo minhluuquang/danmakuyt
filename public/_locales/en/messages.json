@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "DanmakuYT",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "A browser extension built with WXT, React, Radix UI, and Tailwind CSS",
+    "description": "Extension description"
+  },
+  "extActionTitle": {
+    "message": "Open DanmakuYT Side Panel",
+    "description": "Action button title"
+  }
+}
